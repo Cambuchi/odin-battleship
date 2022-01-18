@@ -16,6 +16,7 @@ const Ship = (array) => {
     }
   };
 
+  // check if the ship is sunken
   const isSunk = () => {
     let infoArray = Object.entries(info);
     let infoCheck = infoArray.filter(([key, value]) => {
@@ -27,6 +28,7 @@ const Ship = (array) => {
     return false;
   };
 
+  // create the ship as an object of space:status information
   let info = createShip(array);
 
   return { info, hit, isSunk };
