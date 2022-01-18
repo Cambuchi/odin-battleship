@@ -1,8 +1,9 @@
 import Ship from './Ship';
-import PubSub from './pubsub';
-import PubSubMain from '../index';
+import PubSub from './PubSub';
 
 const Gameboard = (player) => {
+  // create PubSub object for board
+  let PubSubInstance = new PubSub();
   // create the board, which is a 10 x 10 grid, logic as an array
   let board = [...Array(100).keys()];
   // record of spaces that are occupied by ships
@@ -11,8 +12,6 @@ const Gameboard = (player) => {
   let hits = [];
   // record of missed shots
   let misses = [];
-  // create PubSub object for board
-  let PubSubInstance = new PubSub();
   // create ship data
   let ships = {};
   // create ship types
@@ -24,22 +23,6 @@ const Gameboard = (player) => {
     2: 'Patrol Boat',
   };
 
-  // check if arrays have intersecting values
-  const isIntersecting = (array1, array2) => {
-    const intersecting = array1.filter((value) => array2.includes(value));
-    if (intersecting.length === 0) {
-      return false;
-    }
-    return true;
-  };
-
-  // check if two arrays are equal
-  function arraysEqual(a1, a2) {
-    let a1copy = a1.slice();
-    let a2copy = a2.slice();
-    return JSON.stringify(a1copy) == JSON.stringify(a2copy);
-  }
-
   // adds a ship onto the board and records the spaces occupied
   const addShip = (array) => {
     // check if ship space is occupied
@@ -47,28 +30,29 @@ const Gameboard = (player) => {
       return;
     }
     // check for invalid horizontal placements (wrap-arounds)
-    const wrapArounds = [
-      [9, 10],
-      [19, 20],
-      [29, 30],
-      [39, 40],
-      [49, 50],
-      [59, 60],
-      [69, 70],
-      [79, 80],
-      [89, 90],
-    ];
-    for (let invalids of wrapArounds) {
-      if (array.includes(invalids[0]) && array.includes(invalids[1])) {
-        return;
-      }
+    if (isWrapAround(array)) {
+      return;
     }
     // add ship
     let newShip = Ship(array);
     let shipName = shipTypes[array.length];
+    // on successful hits, udpate individual ship hits if needed
     PubSubInstance.subscribe('successfulAttack', newShip.hit);
+    // on successful hits, check if individual ship has sunk
+    PubSubInstance.subscribe('successfulAttack', function () {
+      pubShipSink(newShip, shipName);
+    });
     ships[shipName] = newShip;
     shipSpaces.push(...array);
+  };
+
+  const pubShipSink = (ship, name) => {
+    if ('isSunk' in ship) {
+      if (ship.isSunk()) {
+        PubSubInstance.publish('sunkenShip', name);
+        delete ship.isSunk;
+      }
+    }
   };
 
   const receiveAttack = (coordinate) => {
@@ -98,25 +82,34 @@ const Gameboard = (player) => {
     misses.push(coordinate);
   };
 
+  const shipSank = (name) => {
+    console.log(`${player}'s ${name} has been destroyed!`);
+    return name;
+  };
+
   const isGameOver = () => {
+    // check for invalid board state (no ship spaces)
+    if (shipSpaces.length < 1) {
+      return false;
+    }
     let shipSort = shipSpaces.slice().sort();
     let hitsSort = hits.slice().sort();
-    if (arraysEqual(shipSort, hitsSort)) {
+    if (areArraysEqual(shipSort, hitsSort)) {
       // on gameOver state, publish gameover events
-      console.log(player + ' has lost');
-      PubSubMain.publish('gameOver', player);
       return true;
     }
     return false;
   };
 
-  // bind events
+  // bind pubsub events
   // add to misses record on missed hits
   PubSubInstance.subscribe('missedAttack', missedAttack);
   // add to hits record on successful hits and checkgame over
   PubSubInstance.subscribe('successfulAttack', successfulAttack);
   // on successful hits, check game state
   PubSubInstance.subscribe('successfulAttack', isGameOver);
+  // on ship sinking,
+  PubSubInstance.subscribe('sunkenShip', shipSank);
 
   return {
     addShip,
@@ -125,56 +118,110 @@ const Gameboard = (player) => {
   };
 };
 
-const carrier = [1, 2, 3, 4, 5, 6];
-const battleship = [6, 16, 17, 18, 19];
-const cruiser = [19, 20, 21, 22];
-const submarine = [31, 32, 33];
-const patrolBoat = [41, 42];
+// check if arrays have intersecting values
+const isIntersecting = (array1, array2) => {
+  const intersecting = array1.filter((value) => array2.includes(value));
+  if (intersecting.length === 0) {
+    return false;
+  }
+  return true;
+};
 
-const player1 = Gameboard('player1');
-const player2 = Gameboard('cpu');
+const isWrapAround = (array) => {
+  // values that cannot exist in a ship due to grid wrapping
+  const wrapArounds = [
+    [9, 10],
+    [19, 20],
+    [29, 30],
+    [39, 40],
+    [49, 50],
+    [59, 60],
+    [69, 70],
+    [79, 80],
+    [89, 90],
+  ];
+  for (let invalids of wrapArounds) {
+    if (array.includes(invalids[0]) && array.includes(invalids[1])) {
+      return true;
+    }
+  }
+  return false;
+};
 
-// newGame.addShip(carrier);
-// newGame.addShip(battleship);
-// newGame.addShip(cruiser);
-// newGame.addShip(submarine);
-// newGame.addShip(patrolBoat);
+// check if two arrays are equal
+const areArraysEqual = (a1, a2) => {
+  let a1copy = a1.slice();
+  let a2copy = a2.slice();
+  return JSON.stringify(a1copy) == JSON.stringify(a2copy);
+};
 
-// newGame.receiveAttack(1);
-// newGame.receiveAttack(19);
-// newGame.receiveAttack(19);
-// newGame.receiveAttack(20);
-// newGame.receiveAttack(2);
-// newGame.receiveAttack(3);
-// newGame.receiveAttack(4);
-// newGame.receiveAttack(5);
-// newGame.receiveAttack(6);
-// newGame.receiveAttack(32);
-// newGame.receiveAttack(33);
-// newGame.receiveAttack(41);
-// newGame.receiveAttack(31);
-// newGame.receiveAttack(42);
-// newGame.receiveAttack(102);
+export { Gameboard, isIntersecting, isWrapAround, areArraysEqual };
 
-// console.log(newGame.hits);
-// console.log(newGame.misses);
+// const carrier = [1, 2, 3, 4, 5, 6];
+// const battleship = [11, 12, 13, 14, 15];
+// const cruiser = [21, 22, 23, 24];
+// const submarine = [31, 32, 33];
+// const patrolBoat = [41, 42];
 
-// newGame2.addShip(carrier);
-// // newGame.addShip(battleship)
-// // newGame.addShip(cruiser)
-// newGame2.addShip(submarine);
-// newGame2.addShip(patrolBoat);
+// const outOfBounds = [96, 97, 98, 99, 100, 101];
+// const overlap1 = [11, 12, 13, 14, 15];
+// const overlap2 = [13, 14, 15, 16];
+// const wrapAround = [9, 10, 11];
 
-// newGame2.receiveAttack(5);
-// newGame2.receiveAttack(2);
-// newGame2.receiveAttack(1);
-// newGame2.receiveAttack(19);
-// newGame2.receiveAttack(19);
-// newGame2.receiveAttack(20);
-// newGame2.receiveAttack(74);
+// const player1 = Gameboard('Player-1');
+// const player2 = Gameboard('cpu');
 
-// console.log(newGame2.hits);
-// console.log(newGame2.misses);
+// player1.addShip(carrier);
+// // player1.addShip(battleship);
+// // player1.addShip(cruiser);
+// player1.addShip(submarine);
+// player1.addShip(patrolBoat);
 
-// console.log(newGame.isGameOver());
-// console.log(newGame2.isGameOver());
+// player1.addShip(wrapAround);
+// player1.receiveAttack(9);
+// player1.receiveAttack(10);
+// player1.receiveAttack(11);
+// // console.log(player1.shipSpaces);
+// // console.log(player1.hits);
+
+// player1.receiveAttack(1);
+// player1.receiveAttack(19);
+// player1.receiveAttack(19);
+// player1.receiveAttack(20);
+// player1.receiveAttack(2);
+// player1.receiveAttack(3);
+// player1.receiveAttack(4);
+// player1.receiveAttack(5);
+// player1.receiveAttack(6);
+// player1.receiveAttack(32);
+// player1.receiveAttack(33);
+// player1.receiveAttack(41);
+// player1.receiveAttack(31);
+// player1.receiveAttack(42);
+// player1.receiveAttack(102);
+
+// // console.log(player1.hits);
+// // console.log(player1.misses);
+
+// player2.addShip(carrier);
+// // player2.addShip(battleship)
+// // player2.addShip(cruiser)
+// player2.addShip(submarine);
+// player2.addShip(patrolBoat);
+
+// player2.receiveAttack(5);
+// player2.receiveAttack(2);
+// player2.receiveAttack(1);
+// player2.receiveAttack(19);
+// player2.receiveAttack(19);
+// player2.receiveAttack(20);
+// player2.receiveAttack(74);
+
+// // console.log(player2.hits);
+// // console.log(player2.misses);
+
+// // console.log(player1.ships);
+// // console.log(player2.ships);
+
+// console.log(player1.isGameOver());
+// console.log(player2.isGameOver());
