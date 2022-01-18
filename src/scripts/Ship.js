@@ -1,3 +1,5 @@
+import PubSubInstance from './pubsub';
+
 // ship factory, needs array of numbers indicating spaces that the ship occupies
 const Ship = (array) => {
   // create the initial ship array
