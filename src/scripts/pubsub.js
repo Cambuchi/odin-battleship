@@ -51,21 +51,3 @@ export default class PubSub {
     }
   }
 }
-
-// const sayWhat1 = (string) => {
-//   console.log(string);
-// };
-// pubSub.subscribe('activate', sayWhat1);
-
-// const sayWhat2 = (string) => {
-//   console.log(string + ' 2');
-// };
-// pubSub.subscribe('activate', sayWhat2);
-
-// const sayWhat3 = () => {
-//   console.log('3');
-// };
-// pubSub.subscribe('activate', sayWhat3);
-
-// pubSub.publish('activate');
-// pubSub.publish('activate', 'test again');

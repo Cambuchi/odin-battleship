@@ -3,7 +3,7 @@ import PubSub from './PubSub';
 
 const Gameboard = (player) => {
   // create PubSub object for board
-  let PubSubInstance = new PubSub();
+  let PubSubBoard = new PubSub();
   // create the board, which is a 10 x 10 grid, logic as an array
   let board = [...Array(100).keys()];
   // record of spaces that are occupied by ships
@@ -22,6 +22,16 @@ const Gameboard = (player) => {
     3: 'Submarine',
     2: 'Patrol Boat',
   };
+  // list of current ships alive
+  let shipsAlive = [
+    'Carrier',
+    'Battleship',
+    'Cruiser',
+    'Submarine',
+    'Patrol Boat',
+  ];
+  // list of current ships sunk
+  let shipsSank = [];
 
   // adds a ship onto the board and records the spaces occupied
   const addShip = (array) => {
@@ -37,9 +47,9 @@ const Gameboard = (player) => {
     let newShip = Ship(array);
     let shipName = shipTypes[array.length];
     // on successful hits, udpate individual ship hits if needed
-    PubSubInstance.subscribe('successfulAttack', newShip.hit);
+    PubSubBoard.subscribe('successfulAttack', newShip.hit);
     // on successful hits, check if individual ship has sunk
-    PubSubInstance.subscribe('successfulAttack', function () {
+    PubSubBoard.subscribe('successfulAttack', function () {
       pubShipSink(newShip, shipName);
     });
     ships[shipName] = newShip;
@@ -49,7 +59,7 @@ const Gameboard = (player) => {
   const pubShipSink = (ship, name) => {
     if ('isSunk' in ship) {
       if (ship.isSunk()) {
-        PubSubInstance.publish('sunkenShip', name);
+        PubSubBoard.publish('sunkenShip', name);
         delete ship.isSunk;
       }
     }
@@ -58,19 +68,21 @@ const Gameboard = (player) => {
   const receiveAttack = (coordinate) => {
     // make sure the coordinate passed in is valid
     if (!board.includes(coordinate)) {
-      return;
+      return false;
     }
     // make sure the coordinate passed in is a new one
     else if (hits.includes(coordinate) || misses.includes(coordinate)) {
-      return;
+      return false;
     }
     // if the coordinate is a miss
     else if (!shipSpaces.includes(coordinate) && !misses.includes(coordinate)) {
-      PubSubInstance.publish('missedAttack', coordinate);
+      PubSubBoard.publish('missedAttack', coordinate);
+      return 'missed';
     }
     // if the coordinate is a hit
     else if (shipSpaces.includes(coordinate) && !hits.includes(coordinate)) {
-      PubSubInstance.publish('successfulAttack', coordinate);
+      PubSubBoard.publish('successfulAttack', coordinate);
+      return 'hit';
     }
   };
 
@@ -84,7 +96,12 @@ const Gameboard = (player) => {
 
   const shipSank = (name) => {
     console.log(`${player}'s ${name} has been destroyed!`);
+    shipsSank.push(shipsAlive.pop(name));
     return name;
+  };
+
+  const shipChange = () => {
+    return shipsSank;
   };
 
   const isGameOver = () => {
@@ -96,25 +113,29 @@ const Gameboard = (player) => {
     let hitsSort = hits.slice().sort();
     if (areArraysEqual(shipSort, hitsSort)) {
       // on gameOver state, publish gameover events
+      PubSubBoard.publish('gameEnded', player);
       return true;
+    } else {
+      return false;
     }
-    return false;
   };
 
   // bind pubsub events
   // add to misses record on missed hits
-  PubSubInstance.subscribe('missedAttack', missedAttack);
+  PubSubBoard.subscribe('missedAttack', missedAttack);
   // add to hits record on successful hits and checkgame over
-  PubSubInstance.subscribe('successfulAttack', successfulAttack);
+  PubSubBoard.subscribe('successfulAttack', successfulAttack);
   // on successful hits, check game state
-  PubSubInstance.subscribe('successfulAttack', isGameOver);
+  PubSubBoard.subscribe('successfulAttack', isGameOver);
   // on ship sinking,
-  PubSubInstance.subscribe('sunkenShip', shipSank);
+  PubSubBoard.subscribe('sunkenShip', shipSank);
 
   return {
     addShip,
     receiveAttack,
     isGameOver,
+    shipChange,
+    PubSubBoard,
   };
 };
 
@@ -204,8 +225,8 @@ export { Gameboard, isIntersecting, isWrapAround, areArraysEqual };
 // // console.log(player1.misses);
 
 // player2.addShip(carrier);
-// // player2.addShip(battleship)
-// // player2.addShip(cruiser)
+// player2.addShip(battleship)
+// player2.addShip(cruiser)
 // player2.addShip(submarine);
 // player2.addShip(patrolBoat);
 
@@ -220,8 +241,13 @@ export { Gameboard, isIntersecting, isWrapAround, areArraysEqual };
 // // console.log(player2.hits);
 // // console.log(player2.misses);
 
-// // console.log(player1.ships);
+// console.log(player1.ships);
 // // console.log(player2.ships);
+
+// console.log(player1.shipsAlive);
+// console.log(player2.shipsAlive);
+// console.log(player1.shipsSank);
+// console.log(player2.shipsSank);
 
 // console.log(player1.isGameOver());
 // console.log(player2.isGameOver());
