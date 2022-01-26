@@ -1,0 +1,27 @@
+/*//////////////////*/
+ /* CSS FOR CONTENT */
+ /*/////////////////*/
+
+
+ @font-face {
+  font-family: 'ArticulatCF-Regular';
+  src: url(../assets/fonts/ArticulatCF-Regular.woff2) format('woff2');
+  font-style: normal;
+}
+
+#content {
+  margin-top: 10vh;
+  font-family: 'ArticulatCF-Regular';
+  display: flex;
+  flex-direction: column;
+  padding: 2vh 10vh;
+  width: fit-content;
+  align-self: center;
+}
+
+@media only screen and (max-width: 750px) {
+  #content {
+    width: 100vw;
+    padding: 2vh 10px;
+  }
+}
